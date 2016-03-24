@@ -96,8 +96,6 @@ case class CoFree[ S[ _ ] : Functor, A ]( head: A, tail: S[ CoFree[ S, A ] ] ) {
 
   final def extract: A = head
 
-  final def copure: A = head
-
   final def map[ B ]( f: A => B ): CoFree[ S, B ] =
     applyCoFree( f, _ map f )
 
