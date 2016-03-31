@@ -80,6 +80,34 @@ object State {
     }
 }
 
+case class NEL[A](head: A, tail: Option[NEL[A]]) {
+  def tails: NEL[NEL[A]] = NEL(this, tail.map(_.tails))
+}
+
+object NEL {
+  implicit val NELComonad: Comonad[NEL] = new Comonad[NEL] {
+    def extract[A](x: NEL[A]): A = x.head
+
+    def coflatMap[A, B](fa: NEL[A])(f: (NEL[A]) => B): NEL[B] = map(fa.tails)(f)
+
+    def map[A, B](fa: NEL[A])(f: (A) => B): NEL[B] = NEL(f(fa.head), fa.tail.map(map(_)(f)))
+  }
+}
+
+case class Tree[A](tip: A, sub: List[Tree[A]]) {
+  def subTrees: Tree[Tree[A]] = Tree(this, sub.map(_.subTrees))
+}
+
+object Tree {
+  implicit val TreeComonad: Comonad[Tree] = new Comonad[Tree] {
+    def extract[A](x: Tree[A]): A = x.tip
+
+    def coflatMap[A, B](fa: Tree[A])(f: (Tree[A]) => B): Tree[B] = map(fa.subTrees)(f)
+
+    def map[A, B](fa: Tree[A])(f: (A) => B): Tree[B] = Tree(f(fa.tip), fa.sub.map(map(_)(f)))
+  }
+}
+
 object Duals {
   import cats.syntax.flatMap._
   import cats.syntax.functor._
