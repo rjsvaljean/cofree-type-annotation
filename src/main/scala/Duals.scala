@@ -1,6 +1,6 @@
 package rjs
 
-import cats.{Comonad, Monad, Monoid}
+import cats.{Comonad, Functor, Monad, Monoid}
 
 import scala.util.Try
 
@@ -80,6 +80,19 @@ object State {
     }
 }
 
+case class Store[S, A](peek: S => A, cursor: S)
+
+object Store {
+  implicit def storeComonad[S]: Comonad[({type l[a] = Store[S, a]})#l] =
+    new Comonad[({type l[a] = Store[S, a]})#l] {
+      def extract[A](x: Store[S, A]): A = x.peek(x.cursor)
+
+      def coflatMap[A, B](fa: Store[S, A])(f: (Store[S, A]) => B): Store[S, B] = Store(s => f(Store(fa.peek, s)), fa.cursor)
+
+      def map[A, B](fa: Store[S, A])(f: (A) => B): Store[S, B] = coflatMap(fa)(extract[A] _ andThen f)
+    }
+}
+
 case class NEL[A](head: A, tail: Option[NEL[A]]) {
   def tails: NEL[NEL[A]] = NEL(this, tail.map(_.tails))
 }
@@ -105,6 +118,44 @@ object Tree {
     def coflatMap[A, B](fa: Tree[A])(f: (Tree[A]) => B): Tree[B] = map(fa.subTrees)(f)
 
     def map[A, B](fa: Tree[A])(f: (A) => B): Tree[B] = Tree(f(fa.tip), fa.sub.map(map(_)(f)))
+  }
+}
+
+trait Adjunction[F[_], G[_]] {
+  def left[A, B](f: F[A] => B): A => G[B]
+  def right[A, B](f: A => G[B]): F[A] => B
+  def monad(implicit FunctorG: Functor[G]): Monad[({type l[a] = G[F[a]]})#l] = new Monad[({type l[a] = G[F[a]]})#l] {
+    def pure[A](x: A): G[F[A]] = left(identity[F[A]])(x)
+
+    def flatMap[A, B](fa: G[F[A]])(f: (A) => G[F[B]]): G[F[B]] = FunctorG.map(fa)(right(f))
+  }
+  def comonad(implicit FunctorF: Functor[F]): Comonad[({type l[a] = F[G[a]]})#l] = new Comonad[({type l[a] = F[G[a]]})#l] {
+    def extract[A](x: F[G[A]]): A = right(identity[G[A]])(x)
+
+    def coflatMap[A, B](fa: F[G[A]])(f: (F[G[A]]) => B): F[G[B]] = FunctorF.map(fa)(left(f))
+
+    def map[A, B](fa: F[G[A]])(f: (A) => B): F[G[B]] = coflatMap(fa)(extract[A] _ andThen f)
+  }
+}
+
+
+object Adjunction {
+  def homSetAdj[R] = new Adjunction[({type l[a] = Coreader[R, a]})#l, ({type l[a] = Reader[R, a]})#l] {
+    def left[A, B](f: (Coreader[R, A]) => B): (A) => Reader[R, B] = {(a: A) => Reader((r: R) => f(Coreader(a, r)))}
+
+    def right[A, B](f: (A) => Reader[R, B]): (Coreader[R, A]) => B = { in =>
+      val Coreader(extract, ask) = in
+      f(extract).run(ask)
+    }
+  }
+
+  def otherAdj[W] = new Adjunction[({type l[a] = Writer[W, a]})#l, ({type l[a] = Cowriter[W, a]})#l] {
+    def left[A, B](f: (Writer[W, A]) => B): (A) => Cowriter[W, B] = {(a: A) => Cowriter((r: W) => f(Writer(a, r)))}
+
+    def right[A, B](f: (A) => Cowriter[W, B]): (Writer[W, A]) => B = { in =>
+      val Writer(value, log) = in
+      f(value).tell(log)
+    }
   }
 }
 
