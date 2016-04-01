@@ -1,5 +1,7 @@
 package rjs
 
+import cats.Monoid
+
 object BLEBW {
   // (| b, plus |)
   trait Catamorphism[A, B] {
@@ -17,6 +19,20 @@ object BLEBW {
       def b: Int = 0
 
       def plus: (A, Int) => Int = { case (_, i) => i + 1 }
+    }
+
+    def Map[A, B](f: A => B) = new Catamorphism[A, List[B]] {
+      def b: List[B] = Nil
+
+      def plus: (A, List[B]) => List[B] = {
+        case (a, bs) => f(a) :: bs
+      }
+    }
+
+    object CatamorphismPartOfFactorial extends Catamorphism[Int, Int] {
+      def b: Int = 1
+
+      def plus: (Int, Int) => Int = _ * _
     }
   }
 
@@ -45,10 +61,11 @@ object BLEBW {
     }
   }
 
+  // [( g , p )]
   trait Anamorphism[A, B] {
-    def p: B => Boolean
-    def g: B => (A, B)
-    def h: B => List[A] = { b =>
+    def p: A => Boolean
+    def g: A => (B, A)
+    def h: A => List[B] = { b =>
       if (p(b)) Nil
       else {
         val (a, _b) = g(b)
@@ -58,7 +75,7 @@ object BLEBW {
   }
 
   object Anamorphism {
-    def Zip[A, B] = new Anamorphism[(A, B), (List[A], List[B])] {
+    def Zip[A, B] = new Anamorphism[(List[A], List[B]), (A, B)] {
       def p: ((List[A], List[B])) => Boolean = {
         case (Nil, _) | (_, Nil) => true
         case _ => false
@@ -66,7 +83,98 @@ object BLEBW {
 
       def g: ((List[A], List[B])) => ((A, B), (List[A], List[B])) = {
         case (a :: as, b :: bs) => ((a, b), (as, bs))
-        case _ => sys.error("Invalid")
+        case _ => ???
+      }
+    }
+
+    def Iterate[A](f: A => A, _p: A => Boolean) = new Anamorphism[A, A] {
+      def p: (A) => Boolean = _p
+
+      def g: (A) => (A, A) = {a => (a, f(a))}
+    }
+
+    def Map[A, B](f: A => B) = new Anamorphism[List[A], B] {
+      def p: (List[A]) => Boolean = _.isEmpty
+
+      def g: (List[A]) => (B, List[A]) = {
+        case a :: as => (f(a), as)
+        case _ => ???
+      }
+    }
+
+    object AnamorphismPartOfFactorial extends Anamorphism[Int, Int] {
+      def p: (Int) => Boolean = _ == 0
+
+      def g: (Int) => (Int, Int) = {i => (i, i -1)}
+    }
+  }
+
+  // [[ ( c , plus ) , (g , p) ]]
+  trait Hylomorphism[A, B, C] {
+    def c: C              // From RequirementForConvertingAnaToHylomorphism#zero (C == F[A])
+    def plus: (B, C) => C // From RequirementForConvertingAnaToHylomorphism#cons
+    def g: A => (B, A)    // From Anamorphism
+    def p: A => Boolean   // From Anamorphism
+
+    def h(a: A): C =
+      if (p(a)) c
+      else {
+        val (b, _a) = g(a)
+        plus(b, h(_a))
+      }
+  }
+
+  object Hylomorphism {
+    object Factorial extends Hylomorphism[Int, Int, Int] {
+      def c: Int = 1
+
+      def plus: (Int, Int) => Int = _ * _
+
+      def g: (Int) => (Int, Int) = {i => (i, i - 1)}
+
+      def p: (Int) => Boolean = _ == 0
+    }
+  }
+
+  // This is exactly the same structure as an anamorphism except that Nil has been replaced by c and Cons by plus
+
+  trait RequirementForConvertingAnaToHylomorphism[F[_]] {
+    type A
+    def zero: F[A]
+    def cons: (A, F[A]) => F[A]
+  }
+
+  object RequirementForConvertingAnaToHylomorphism {
+    type Aux[F[_], _A] = RequirementForConvertingAnaToHylomorphism[F] { type A = _A }
+
+    implicit def ListFreeMonoid[Fix]: RequirementForConvertingAnaToHylomorphism.Aux[List, Fix] =
+      new RequirementForConvertingAnaToHylomorphism[List] {
+        type A = Fix
+
+        def zero: List[Fix] = Nil
+        def cons: (Fix, List[Fix]) => List[Fix] = _ :: _
+      }
+  }
+
+  abstract class AbstractedOverListAnamorphism[F[_], A, B](implicit req: RequirementForConvertingAnaToHylomorphism.Aux[F, B]) {
+    def p: A => Boolean
+    def g: A => (B, A)
+    def h: A => F[B] = { b =>
+      if (p(b)) req.zero
+      else {
+        val (a, _b) = g(b)
+        req.cons(a, h(_b))
+      }
+    }
+  }
+
+  object AbstractedOverListAnamorphism {
+    def Map[A, B](f: A => B) = new AbstractedOverListAnamorphism[List, List[A], B] {
+      def p: (List[A]) => Boolean = _.isEmpty
+
+      def g: (List[A]) => (B, List[A]) = {
+        case a :: as => (f(a), as)
+        case _ => ???
       }
     }
   }
