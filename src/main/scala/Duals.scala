@@ -149,7 +149,7 @@ object Adjunction {
     }
   }
 
-  def otherAdj[W] = new Adjunction[({type l[a] = Writer[W, a]})#l, ({type l[a] = Cowriter[W, a]})#l] {
+  def otherAdj[W : Monoid] = new Adjunction[({type l[a] = Writer[W, a]})#l, ({type l[a] = Cowriter[W, a]})#l] {
     def left[A, B](f: (Writer[W, A]) => B): (A) => Cowriter[W, B] = {(a: A) => Cowriter((r: W) => f(Writer(a, r)))}
 
     def right[A, B](f: (A) => Cowriter[W, B]): (Writer[W, A]) => B = { in =>
