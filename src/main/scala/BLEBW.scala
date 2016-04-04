@@ -178,4 +178,34 @@ object BLEBW {
       }
     }
   }
+
+  trait Paramorphism[A, B] {
+    type C = (List[A], B)
+    def b: B
+    def plus(x: A, y: C): B
+    def h(i: List[A]): B = i match {
+      case Nil => b
+      case a :: as => plus(a, (as, h(as)))
+    }
+  }
+
+  object Paramorphism {
+//    object Factorial extends Paramorphism[Int, Int] {
+//      type B = Int
+//      def b = 1
+//      def plus(n: Int, m: Int): Int = (n + 1) * m
+//
+//    }
+
+    def Tails[A] = new Paramorphism[List[A], List[List[A]]] {
+      def b: List[List[A]] = List[A]() :: Nil
+      def plus(a: A, as: List[A], tls: List[List[A]]): List[List[A]] =
+      def h(i: List[A]): List[List[A]] = i match {
+        case Nil => b
+        case a :: as => plus(a, as, h(as))
+      }
+
+      def plus(x: List[A], y: (List[List[A]], List[List[A]])): List[List[A]] = ???
+}
+  }
 }
