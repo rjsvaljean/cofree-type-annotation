@@ -179,33 +179,66 @@ object BLEBW {
     }
   }
 
-  trait Paramorphism[A, B] {
-    type C = (List[A], B)
+  trait ListParamorphism[A, B] {
     def b: B
-    def plus(x: A, y: C): B
+    def plus(x: A, y: (List[A], B)): B
     def h(i: List[A]): B = i match {
       case Nil => b
       case a :: as => plus(a, (as, h(as)))
     }
   }
 
-  object Paramorphism {
-//    object Factorial extends Paramorphism[Int, Int] {
-//      type B = Int
-//      def b = 1
-//      def plus(n: Int, m: Int): Int = (n + 1) * m
-//
-//    }
-
-    def Tails[A] = new Paramorphism[List[A], List[List[A]]] {
-      def b: List[List[A]] = List[A]() :: Nil
-      def plus(a: A, as: List[A], tls: List[List[A]]): List[List[A]] =
-      def h(i: List[A]): List[List[A]] = i match {
-        case Nil => b
-        case a :: as => plus(a, as, h(as))
-      }
-
-      def plus(x: List[A], y: (List[List[A]], List[List[A]])): List[List[A]] = ???
-}
+  trait NumParamorphism[B] {
+    def b: B
+    def plus (x: Num, y: B): B
+    def h(i: Num): B = i match {
+      case Zero => b
+      case Succ(iMinus1) => plus(iMinus1, h(iMinus1))
+    }
   }
+
+  object Paramorphism {
+    object Factorial extends NumParamorphism[Num] {
+      def b: Num = Num(1)
+
+      def plus(x: Num, y: Num): Num = Succ(x) times y
+    }
+
+    def Tails[A] = new ListParamorphism[A, List[List[A]]] {
+      def b: List[List[A]] = List[A]() :: Nil
+
+      def plus(a: A, asAndTls: (List[A], List[List[A]])): List[List[A]] = (a :: asAndTls._1) :: asAndTls._2
+    }
+  }
+}
+
+object Zero extends Num
+case class Succ(n: Num) extends Num
+object Num {
+  def apply(i: Int) = fromInt(i)
+
+  def fromInt(i: Int): Num =
+    if (i == 0) Zero
+    else Succ(fromInt(i - 1))
+
+  def toInt(n: Num): Int = n match {
+    case Zero => 0
+    case Succ(nMinus1) => 1 + toInt(nMinus1)
+  }
+}
+
+sealed trait Num {
+  override def toString = s"Num: ${Num.toInt(this)}"
+
+  def plus(n2: Num): Num = this match {
+    case Zero => n2
+    case Succ(nMinus1) => nMinus1.plus(Succ(n2))
+  }
+
+  def times(n: Num): Num = n match {
+    case Zero => Zero
+    case Succ(Zero) => this
+    case Succ(nMinus1) => this plus times(nMinus1)
+  }
+
 }
