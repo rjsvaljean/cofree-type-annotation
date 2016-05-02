@@ -179,22 +179,37 @@ object BLEBW {
     }
   }
 
-  trait ListParamorphism[A, B] {
+//  trait ListParamorphism[A, B] {
+//    def b: B
+//    def plus(x: List[A], y: B): B
+//    def h(i: List[A]): B = i match {
+//      case Nil => b
+//      case as @ _ :: tail => plus(as, h(tail))
+//    }
+//  }
+
+//  trait NumParamorphism[B] {
+//    def b: B
+//    def plus (x: Num, y: B): B
+//    def h(i: Num): B = i match {
+//      case Zero => b
+//      case Succ(iMinus1) => plus(iMinus1, h(iMinus1))
+//    }
+//  }
+
+  trait Paramorphism[A, B] {
     def b: B
-    def plus(x: A, y: (List[A], B)): B
-    def h(i: List[A]): B = i match {
-      case Nil => b
-      case a :: as => plus(a, (as, h(as)))
-    }
+    def plus(x: A, y: B): B
+    def fold(a: A)(b: B)(f: (A, A) => B): B
+    def h(i: A): B = fold(i)(b)((context, _i) => plus(context, h(_i)))
   }
 
-  trait NumParamorphism[B] {
-    def b: B
-    def plus (x: Num, y: B): B
-    def h(i: Num): B = i match {
-      case Zero => b
-      case Succ(iMinus1) => plus(iMinus1, h(iMinus1))
-    }
+  trait NumParamorphism[B] extends Paramorphism[Num, B] {
+    def fold(a: Num)(b: B)(f: (Num, Num) => B): B = a match { case Zero => b ; case Succ(_a) => f(_a, _a)}
+  }
+
+  trait ListParamorphism[A, B] extends Paramorphism[List[A], B] {
+    def fold(a: List[A])(b: B)(f: (List[A], List[A]) => B): B = a match { case Nil => b ; case as @ _ :: tail => f(as, tail)}
   }
 
   object Paramorphism {
@@ -207,7 +222,8 @@ object BLEBW {
     def Tails[A] = new ListParamorphism[A, List[List[A]]] {
       def b: List[List[A]] = List[A]() :: Nil
 
-      def plus(a: A, asAndTls: (List[A], List[List[A]])): List[List[A]] = (a :: asAndTls._1) :: asAndTls._2
+      def plus(cons: List[A], tails: List[List[A]]): List[List[A]] =
+        cons :: tails // Fine because cons is never empty
     }
   }
 }
