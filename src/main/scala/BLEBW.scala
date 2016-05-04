@@ -1,7 +1,5 @@
 package rjs
 
-import cats.Monoid
-
 object BLEBW {
   // (| b, plus |)
   trait Catamorphism[A, B] {
@@ -179,24 +177,6 @@ object BLEBW {
     }
   }
 
-//  trait ListParamorphism[A, B] {
-//    def b: B
-//    def plus(x: List[A], y: B): B
-//    def h(i: List[A]): B = i match {
-//      case Nil => b
-//      case as @ _ :: tail => plus(as, h(tail))
-//    }
-//  }
-
-//  trait NumParamorphism[B] {
-//    def b: B
-//    def plus (x: Num, y: B): B
-//    def h(i: Num): B = i match {
-//      case Zero => b
-//      case Succ(iMinus1) => plus(iMinus1, h(iMinus1))
-//    }
-//  }
-
   trait Paramorphism[A, B] {
     def b: B
     def plus(x: A, y: B): B
@@ -224,6 +204,37 @@ object BLEBW {
 
       def plus(cons: List[A], tails: List[List[A]]): List[List[A]] =
         cons :: tails // Fine because cons is never empty
+    }
+  }
+
+  trait BiFunctor[F[_, _]] {
+    def biMap[A, B, C, D](f: A => B, g: C => D): F[A, C] => F[B, D]
+  }
+
+  class BiFunctorLaws[F[_, _]] {
+    def id[A, B](
+      example: F[A, B]
+    )(
+      implicit bif: BiFunctor[F]
+    ) = {
+      val lhs = bif.biMap(identity[A], identity[B])
+      val rhs = identity[F[A, B]]
+      lhs(example) == rhs(example)
+    }
+
+    def composition[A, B, C, D, X, Y](
+      f: A => B,
+      g: C => D,
+      h: X => A,
+      j: Y => C
+    )(
+      example: F[X, Y]
+    )(
+      implicit functor: BiFunctor[F]
+    ) = {
+      val lhs = functor.biMap(f, g).compose(functor.biMap(h, j))
+      val rhs = functor.biMap(f compose h, g compose j)
+      lhs(example) == rhs(example)
     }
   }
 }
