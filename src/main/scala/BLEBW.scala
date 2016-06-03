@@ -1,5 +1,7 @@
 package rjs
 
+import cats.arrow.NaturalTransformation
+
 object BLEBW {
   // (| b, plus |)
   trait Catamorphism[A, B] {
@@ -218,7 +220,7 @@ object BLEBW {
       implicit bif: BiFunctor[F]
     ) = {
       val lhs = bif.biMap(identity[A], identity[B])
-      val rhs = identity[F[A, B]]
+      val rhs = identity[F[A, B]] _
       lhs(example) == rhs(example)
     }
 
