@@ -216,7 +216,7 @@ object FixPart {
   sealed trait ListF[+A, +R] extends Product with Serializable {
     def fold[X](ifNil: => X)(ifCons: (A, R) => X): X
   }
-  trait ListFA[+A] {
+  trait ListFA[A] {
     type l[r] = ListF[A, r]
   }
   case object NilF extends ListF[Nothing, Nothing] {
@@ -836,4 +836,62 @@ object Paramorphism {
       para(phi)
     }
   }
+}
+
+object CompositionalDataTypes {
+  sealed trait :+:[F[_], G[_], R] // Coproduct of pattern functors F and G
+  case class Inl[F[_], G[_], R](fr: F[R]) extends :+:[F, G, R]
+  case class Inr[F[_], G[_], R](gr: G[R]) extends :+:[F, G, R]
+
+  case class :*:[F[_], G[_], R](fr: F[R], gr: G[R]) // Product of pattern functors F and G
+
+  sealed trait FreeF[F[_], A, R] // The free monad pattern functor
+  case class Suspend[F[_], A, R](fr: F[R]) extends FreeF[F, A, R]
+  case class Pure[F[_], A, R](a: A) extends FreeF[F, A, R]
+
+  case class CofreeF[F[_], A, R](fr: F[R], a: A) // The cofree monad pattern functor
+}
+
+object TemplatingExample {
+  import FixPart.Fix
+  import FixPart.cata
+  sealed trait CtxF[F[_], A, R] // The free monad pattern functor
+  case class Term[F[_], A, R](fr: F[R]) extends CtxF[F, A, R]
+  case class Hole[F[_], A, R](a: A) extends CtxF[F, A, R]
+  trait CtxFA[F[_], A] {
+    type l[r] = CtxF[F, A, r]
+  }
+
+  object CtxF {
+    implicit def functor[F[_]: Functor, A]: Functor[CtxFA[F, A]#l] = new Functor[CtxFA[F, A]#l] {
+      def map[R, B](fa: CtxF[F, A, R])(f: (R) => B): CtxF[F, A, B] = fa match {
+        case Term(fr) => Term[F, A, B](Functor[F].map(fr)(f))
+        case Hole(a) => Hole[F, A, B](a)
+      }
+    }
+  }
+
+  type Ctx[F[_], A] = Fix[CtxFA[F, A]#l]
+
+  def fillHoles[F[_]: Functor, A](g: A => Fix[F]): Ctx[F, A] => Fix[F] = {
+    val alg: CtxF[F, A, Fix[F]] => Fix[F] = {
+      case Term(t) => Fix[F](t)
+      case Hole(a) => g(a)
+    }
+    cata[CtxFA[F, A]#l, Fix[F]](alg)
+  }
+}
+
+
+object UnfixedJson {
+  import FixPart.Fix
+  sealed trait JsValueF[R]
+  def JSNull[R]: JsValueF[R] = new JsValueF[R] {}
+  case class JSBool[R](asBoolean: Boolean) extends JsValueF[R]
+  case class JSNumber[R](asDouble: Double) extends JsValueF[R]
+  case class JSString[R](asSting: String) extends JsValueF[R]
+  case class JSArray[R](asVector: Vector[R]) extends JsValueF[R]
+  case class JSObject[R](asAssocList: Vector[(String, R)]) extends JsValueF[R]
+
+  type JSValue = Fix[JsValueF]
 }
