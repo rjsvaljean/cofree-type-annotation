@@ -15,4 +15,4 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.0.0-M7" % "test"
 )
 
-scalacOptions ++= Seq("-feature", "-language:higherKinds")
+scalacOptions ++= Seq("-feature", "-language:higherKinds", "-deprecation")

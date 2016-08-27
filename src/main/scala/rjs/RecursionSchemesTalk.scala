@@ -8,6 +8,8 @@ import cats.std.set.setMonoid
 import cats.{Applicative, Functor, Monad, Monoid, Order}
 import rjs.FixAnamorphims.Cofix
 import rjs.FixPart.{ListF, NatF}
+import rjs.UnfixedJson.JsValueF
+import rjs.json.pJSValueF
 
 object RecursionSchemesTalk {
   def &&&[B, C1, C2](f: B => C1, g: B => C2): B => (C1, C2) = {
@@ -204,6 +206,10 @@ object foldr {
 object FixPart {
   case class Fix[F[_] : Functor](unFix: F[Fix[F]])
   def unFix[F[_]]: Fix[F] => F[Fix[F]] = _.unFix
+  final def fix[A](f: (=> A) => A): A = {
+    lazy val a: A = f(a)
+    a
+  }
 
   // Data type generic programming
   // - allows parametrise functions on the structure or shape of a data-type
@@ -227,11 +233,24 @@ object FixPart {
   }
   def cons[A, R](a: A, r: R): ListF[A, R] = Cons(a, r)
 
+  type MyList[A] = Fix[({type l[r] = ListF[A, r]})#l]
+  def myList[A](as: A*): MyList[A] = as.foldLeft(
+    Fix[ListFA[A]#l](NilF): MyList[A]
+  )(
+    (l: MyList[A], i: A) => Fix[ListFA[A]#l](Cons[A, MyList[A]](i, l))
+  )
+
   object ListF {
     implicit def functor[AA]: Functor[ListFA[AA]#l] = new Functor[ListFA[AA]#l] {
       def map[A, B](fa: ListF[AA, A])(f: (A) => B): ListF[AA, B] = fa match {
         case NilF => NilF
         case Cons(a, r) => Cons(a, f(r))
+      }
+    }
+    implicit def foldable[AA]: Foldable[ListFA[AA]#l] = new Foldable[ListFA[AA]#l] {
+      def foldMap[M: Monoid, R](f: (R) => M)(ta: ListF[AA, R]): M = ta match {
+        case Cons(_, r) => f(r)
+        case NilF => Monoid[M].empty
       }
     }
   }
@@ -420,7 +439,7 @@ object ExprExample {
     println(s"Trying to evaluate: ${ppr(example)}")
     val context: Env = freeVars(example).map { freeVar =>
       println(s"Enter value for $freeVar:")
-      val value = readInt()
+      val value = scala.io.StdIn.readInt()
       println(value)
       freeVar -> value
     }.toMap
@@ -852,6 +871,40 @@ object CompositionalDataTypes {
   case class CofreeF[F[_], A, R](fr: F[R], a: A) // The cofree monad pattern functor
 }
 
+
+
+object UnfixedJson {
+  import FixPart.Fix
+  sealed trait JsValueF[R]
+  trait JsNull[R] extends JsValueF[R]
+  def JSNull[R]: JsValueF[R] = new JsNull[R] {}
+  case class JSBool[R](asBoolean: Boolean) extends JsValueF[R]
+  case class JSNumber[R](asDouble: Double) extends JsValueF[R]
+  case class JSString[R](asSting: String) extends JsValueF[R]
+  case class JSArray[R](asVector: Vector[R]) extends JsValueF[R]
+  case class JSObject[R](asAssocList: Vector[(String, R)]) extends JsValueF[R]
+
+  type JSValue = Fix[JsValueF]
+
+  implicit object functor extends Functor[JsValueF] {
+    def map[A, B](fa: JsValueF[A])(f: (A) => B): JsValueF[B] = fa match {
+      case JSBool(asBoolean) => JSBool(asBoolean)
+      case JSNumber(asDouble) => JSNumber(asDouble)
+      case JSString(asSting) => JSString(asSting)
+      case JSArray(asVector) => JSArray(asVector.map(f))
+      case JSObject(asAssocList) => JSObject(asAssocList.map { case (k, v) => (k, f(v)) } )
+      case _: JsNull[A] => JSNull
+    }
+  }
+
+
+  import fastparse.all._
+  def pars(p: => Parser[JSValue]) = rjs.json.pJSValueF(p).map(Fix[JsValueF])
+  val pJSValue: Parser[JSValue] = FixPart.fix[Parser[JSValue]](pars)
+
+
+}
+
 object TemplatingExample {
   import FixPart.Fix
   import FixPart.cata
@@ -880,18 +933,35 @@ object TemplatingExample {
     }
     cata[CtxFA[F, A]#l, Fix[F]](alg)
   }
-}
 
+  type Name = String
+  type JSTemplate = Ctx[JsValueF, Name]
+  import fastparse.all._
+  def pVar: Parser[Name] = {
+    import fastparse.all._
+    "${" ~ CharIn('a' to 'z').rep.! ~ "}"
+  }
 
-object UnfixedJson {
-  import FixPart.Fix
-  sealed trait JsValueF[R]
-  def JSNull[R]: JsValueF[R] = new JsValueF[R] {}
-  case class JSBool[R](asBoolean: Boolean) extends JsValueF[R]
-  case class JSNumber[R](asDouble: Double) extends JsValueF[R]
-  case class JSString[R](asSting: String) extends JsValueF[R]
-  case class JSArray[R](asVector: Vector[R]) extends JsValueF[R]
-  case class JSObject[R](asAssocList: Vector[(String, R)]) extends JsValueF[R]
+  def pJSTemplate: Parser[Ctx[JsValueF, Name]] = {
+    def f(p: => Parser[Ctx[JsValueF, Name]]) = {
+      val hole = pVar.map(Hole[JsValueF, Name, Ctx[JsValueF, Name]])
+      val term = pJSValueF(p).map(Term[JsValueF, Name, Ctx[JsValueF, Name]])
+      val holeOrTerm = hole | term
+      holeOrTerm.map(Fix[CtxFA[JsValueF, Name]#l](_))
+    }
+    FixPart.fix(f)
+  }
 
-  type JSValue = Fix[JsValueF]
+  def parseUnsafe[R](parser: Parser[R]) = parser.parse(_: String).get.value
+  val temp1 = parseUnsafe(pJSTemplate)("[{\"foo\":${a}}]")
+
+  import UnfixedJson._
+  def vlookup[A](env: Map[A, JSValue]): A => JSValue = {
+    (env.get(_: A)) andThen ((_: Option[JSValue]).getOrElse(Fix(UnfixedJson.JSNull): JSValue))
+  }
+
+  val temp2 = {
+    val f = fillHoles(vlookup(Map("a" -> Fix(JSNumber(42)))))
+    f(temp1)
+  }
 }
