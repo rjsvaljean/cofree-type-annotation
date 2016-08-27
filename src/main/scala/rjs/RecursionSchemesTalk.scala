@@ -76,6 +76,10 @@ trait Traversable[T[_]] {
     mapM[M, M[A], A](identity[M[A]])(tma)
 }
 
+object Traversable {
+  def apply[T[_]](implicit traversable: Traversable[T]) = traversable
+}
+
 trait Tree[+A] extends Product with Serializable
 case object Empty extends Tree[Nothing]
 case class Leaf[A](a: A) extends Tree[A]
@@ -399,7 +403,9 @@ object ExprExample {
       case IfNeg(condition, ifTrue, ifFalse) => condition.flatMap(c => if (c < 0) ifTrue else ifFalse)
     }
   }
-  def eval(env: Env): Expr => Option[Int] = cata(evalAlg(env))
+  def eval(env: Env): Expr => Option[Int] = {
+    cata(evalAlg(env))
+  }
 
 
   // Pretty printer
