@@ -707,6 +707,8 @@ object CoinductiveStreams {
       def c(x: A): StreamF[A, A] = StreamF(x, f(x))
       ana[StreamFA[A]#l, A](c)
     }
+    val s1: Stream[Int] = Stream.iterateS((_: Int) + 1)(1)
+
 
     def takeS[A](n: Int): Stream[A] => List[A] = n match {
       case 0 => (_: Stream[A]) => Nil

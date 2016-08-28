@@ -231,3 +231,41 @@ object Histomorphism {
     histo[ListFA[A]#l, List[A], List[A]](alg)
   }
 }
+
+object FutuMorphism {
+  import RecursionSchemesTalk.|||
+  import rjs.TemplatingExample.{Ctx, CtxFA, CtxF, Hole, Term}
+  import rjs.FixAnamorphims.Cofix
+  import rjs.FixAnamorphims.Cofix.ana
+  import CoinductiveStreams.{StreamF, Stream, StreamFA}
+  def futu[F[_]: Functor, A](coa: A => F[Ctx[F, A]]): A => Cofix[F] =
+    ana[F, Ctx[F, A]](|||(coa, identity[F[Ctx[F, A]]]) compose unCtx[F, A]) compose hole[F, A]
+
+  def unCtx[F[_], A](c: Ctx[F, A]): Either[A, F[Ctx[F, A]]] = {
+    unFix[CtxFA[F, A]#l](c) match {
+      case Hole(x) => Left(x)
+      case Term(t) => Right(t)
+    }
+  }
+
+  def term[F[_]: Functor, A](x: F[Fix[CtxFA[F, A]#l]]): Ctx[F, A] =
+    Fix[CtxFA[F, A]#l](Term[F, A, Fix[CtxFA[F, A]#l]](x))
+  def hole[F[_]: Functor, A](a: A): Ctx[F, A] =
+    Fix[CtxFA[F, A]#l](Hole[F, A, Fix[CtxFA[F, A]#l]](a))
+
+
+  def exch[A]: Stream[A] => Stream[A] = {
+    def coa(xs: Stream[A]): StreamF[A, Ctx[StreamFA[A]#l, Stream[A]]] = StreamF.apply(
+      Stream.headS(Stream.tailS(xs)),
+      term[StreamFA[A]#l, Stream[A]](StreamF.apply(
+        Stream.headS(xs),
+        hole[StreamFA[A]#l, Stream[A]](Stream.tailS(Stream.tailS(xs)))
+      ))
+    )
+    futu[StreamFA[A]#l, Stream[A]](coa)
+  }
+
+  def run = {
+    Stream.takeS(10)(exch(Stream.s1))
+  }
+}
