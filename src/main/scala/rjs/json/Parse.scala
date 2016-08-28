@@ -1,7 +1,7 @@
 package rjs.json
 
 import fastparse.all._
-import rjs.UnfixedJson.JsValueF
+import rjs.recursion.data.{JsValueF, JSNull, JSNumber, JSBool, JSString, JSArray, JSObject}
 
 case class NamedFunction[T, V](f: T => V, name: String) extends (T => V){
   def apply(t: T) = f(t)
@@ -10,8 +10,6 @@ case class NamedFunction[T, V](f: T => V, name: String) extends (T => V){
 }
 
 class ParseJSValueF[R](parseR: => P[R]) {
-  import rjs.UnfixedJson._
-
 
 
   private val Whitespace = NamedFunction(" \r\n".contains(_: Char), "Whitespace")
@@ -28,7 +26,7 @@ class ParseJSValueF[R](parseR: => P[R]) {
     x => JSNumber[R](x.toDouble)
   )
 
-  private val `null`        = P( "null" ).map(_ => JSNull[R])
+  private val `null`        = P( "null" ).map(_ => new JSNull[R])
   private val `false`       = P( "false" ).map(_ => JSBool[R](false))
   private val `true`        = P( "true" ).map(_ => JSBool[R](true))
 
