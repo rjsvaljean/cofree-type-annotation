@@ -531,6 +531,9 @@ object ExprExample {
     def outF: T => F[T]
     def functor: Functor[F] = Functor[F]
   }
+  def inF[F[_], T](implicit fixPoint: Fixpoint[F, T]): (F[T]) => T = fixPoint.inF
+  def outF[F[_], T](implicit fixPoint: Fixpoint[F, T]): (T) => F[T] = fixPoint.outF
+
 
   object Fixpoint {
     implicit def fixFixPoint[F[_]: Functor]: Fixpoint[F, Fix[F]] = new Fixpoint[F, Fix[F]] {
@@ -566,6 +569,16 @@ object ExprExample {
       fixpoint.outF andThen
         (fixpoint.functor.map(_: F[T])(cata(alg))) andThen
         alg
+
+    def ana[F[_], T, A](
+      coalg: A => F[A]
+    )(
+      implicit
+      fixpoint: Fixpoint[F, T]
+    ): A => T =
+      coalg andThen
+        fmap[F, A, T](ana(coalg))(fixpoint.functor) andThen
+        fixpoint.inF
   }
 
 

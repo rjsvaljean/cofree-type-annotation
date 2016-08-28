@@ -131,3 +131,103 @@ object MonadicVariants {
 //  def memoize[K, V, M[_]](f: K => M[V])(x: K): M[V] = {
 
 }
+
+object Apomorphism {
+  import ExprExample.{Fixpoint, inF, outF}
+  import ExprExample.Fixpoint.{ana, cata}
+  import FixPart.{ListF, ListFA, NilF, Cons}
+  import RecursionSchemesTalk.|||
+  def apo[F[_], A, T](coa: A => F[Either[A, T]])(implicit fixpoint: Fixpoint[F, T]): A => T =
+    inF[F, T] compose fmap(|||(apo(coa), identity[T]))(fixpoint.functor) compose coa
+
+  // Can be expressed in terms of an anamorphism
+  def _apo[F[_], A, T](coa: A => F[Either[A, T]])(implicit fixpoint: Fixpoint[F, T]): A => T = {
+    implicit val func: Functor[F] = fixpoint.functor
+    val left: (A) => Either[A, T] = Left(_)
+    val right: (T) => Either[A, T] = Right(_)
+    left andThen ana[F, T, Either[A, T]](|||(coa, outF[F, T] andThen fmap[F, T, Either[A, T]](right)))
+  }
+
+  def insertElem: ListF[Int, List[Int]] => List[Int] = {
+    val c: ListF[Int, List[Int]] => ListF[Int, (Either[ListF[Int, List[Int]], List[Int]])] = {
+      case NilF => NilF
+      case Cons(x, Nil) => Cons(x, Left(NilF))
+      case Cons(x, y :: xs) if x <= y => Cons(x, Right(y :: xs))
+      case Cons(x, y :: xs) if x > y => Cons(y, Left(Cons(x, xs)))
+    }
+    apo[ListFA[Int]#l, ListF[Int, List[Int]], List[Int]](c)
+  }
+
+  def insertionSort: List[Int] => List[Int] = cata[ListFA[Int]#l, List[Int], List[Int]](insertElem)
+}
+
+object Zygomorphism {
+
+  import FixPart.cata
+  import RecursionSchemesTalk.&&&
+  import ExprExample.{ExprF, Env, Expr, evalAlg, example, freeVars, ppr, optimizeFast}
+  import ExprExample.ExprF.IfNeg
+  import cats.std.int.intGroup
+
+  def algZygo[F[_]: Functor, A, B](f: F[B] => B)(g: F[(A, B)] => A): F[(A, B)] => (A, B) =
+    &&&(g, fmap[F, (A, B), B](_._2) andThen f)
+
+  def zygo[F[_]: Functor, A, B](f: F[B] => B)(g: F[(A, B)] => A): Fix[F] => A =
+    cata[F, (A, B)](algZygo(f)(g)) andThen(_._1)
+
+  val discontAlg: ExprF[(Int, Option[Int])] => Int = {
+    case IfNeg((t, tv), (x, Some(xv)), (y, Some(yv))) if xv == yv =>
+      t + x + y
+    case IfNeg((t, Some(tv)), (x, xv), (y, yv)) =>
+      if (tv < 0) t + x else t + y
+    case IfNeg((t, None), (x, xv), (y, yv)) =>
+      1 + t + x  + y
+    case e => (Foldable[ExprF].fold[Int] _ compose fmap[ExprF, (Int, Option[Int]), Int](_._1))(e)
+  }
+  def disconts(env: Env):  Expr => Int = zygo(evalAlg(env))(discontAlg)
+
+  val e2 = Expr.IfNeg(Expr.Var("b"), example, Expr.Const(4))
+  def run = (
+    freeVars(e2),
+    ppr(optimizeFast(e2)),
+    disconts(Map("b" -> -1))(e2)
+  )
+
+}
+
+object Histomorphism {
+  import Annotating.{Ann, attr, ann, unAnn, strip}
+  import RecursionSchemesTalk.&&&
+  import ExprExample.Fixpoint.cata
+  import FixPart.{NatF, ListF, ListFA, NilF, Cons}
+  import ExprExample.Fixpoint
+  def histo[F[_], A, T](alg: F[Ann[F, A]] => A)(implicit fixPoint: Fixpoint[F, T]): T => A = {
+    implicit val functor: Functor[F] = fixPoint.functor
+    attr[F, A] compose cata(ann[F, A] compose &&&(identity[F[Ann[F, A]]], alg))
+  }
+
+  def fib: Int => Int = {
+    val unAnnNat = unAnn[NatF, Int, Int]
+    def f: NatF[Ann[NatF, Int]] => Int = {
+      case FixPart.Zero => 0
+      case FixPart.Succ(i) => unAnnNat(i) match {
+        case (FixPart.Zero, _) => 1
+        case (FixPart.Succ(_i), m) => unAnnNat(_i) match {
+          case (_, n) => n + m
+        }
+      }
+    }
+    histo(f)
+  }
+
+  def evens[A]: List[A] => List[A] = {
+    def alg: ListF[A, Ann[ListFA[A]#l, List[A]]] => List[A] = {
+      case NilF => List[A]()
+      case Cons(_, i) => strip[ListFA[A]#l, List[A]](i) match {
+        case NilF => List[A]()
+        case Cons(x, y) => x :: attr[ListFA[A]#l, List[A]](y)
+      }
+    }
+    histo[ListFA[A]#l, List[A], List[A]](alg)
+  }
+}
