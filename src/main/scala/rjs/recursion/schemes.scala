@@ -1,9 +1,9 @@
 package rjs.recursion
 
 import cats.Functor
-import rjs.recursion.data.{Cofix, Fix, Ctx, unFix}
+import rjs.recursion.data._
 import rjs.recursion.data.Ctx.hole
-import rjs.recursion.utils.{fmap, &&&, |||}
+import rjs.recursion.utils.{&&&, fmap, |||}
 
 object schemes {
   def cata[F[_]: Functor, A](alg: F[A] => A): Fix[F] => A =
@@ -22,6 +22,12 @@ object schemes {
     cata[F, (A, Fix[F])](&&&(alg, fmap[F, (A, Fix[F]), Fix[F]](_._2) andThen Fix[F])) andThen(_._1)
   }
 
+  def apo[F[_]: Functor, A](coalg: A => F[Either[A, Fix[F]]]): A => Fix[F] = {
+    Fix[F] _ compose fmap(|||(apo[F, A](coalg), identity[Fix[F]])) compose coalg
+  }
+  def histo[F[_]: Functor, A](alg: F[Ann.T[F, A]] => A): Fix[F] => A = {
+    Ann.attr[F, A] compose cata(Ann.ann[F, A] compose &&&(identity[F[Ann.T[F, A]]], alg))
+  }
 
   def zygo[F[_]: Functor, A, B](f: F[B] => B)(g: F[(A, B)] => A): Fix[F] => A = {
     def algZygo(f: F[B] => B)(g: F[(A, B)] => A): F[(A, B)] => (A, B) =
