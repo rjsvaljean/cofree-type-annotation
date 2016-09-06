@@ -3,13 +3,10 @@ package rjs.recursion
 import cats.Monad
 import cats.data._
 import rjs.recursion.data.{Expr, ExprF, Fix, Traversable, unFix}
+import rjs.recursion.schemes.cataM
 import rjs.recursion.Part2GeneralizedCata.Env
 
 object Part8MonadicVariants {
-  import cats.data.Kleisli
-  def cataM[M[_]: Monad, F[_]: Traversable, A](algM: F[A] => M[A]): Fix[F] => M[A] = {
-    (Kleisli(Traversable[F].mapM(cataM(algM)) _ compose unFix[F]) andThen Kleisli(algM)).run
-  }
 
   /*
     def eval(env: Env): Expr => Option[Int] = {

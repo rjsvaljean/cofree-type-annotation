@@ -21,7 +21,7 @@ object ExprF {
   }
 
   implicit object traversable extends Traversable[ExprF] {
-    def traverse[F[_] : Applicative, A, B](f: (A) => F[B])(ta: ExprF[A]): F[ExprF[B]] = {
+    def traverse[F[_] : Applicative, A, B](f: => (A) => F[B])(ta: ExprF[A]): F[ExprF[B]] = {
       ta match {
         case const @ Const(_) => Applicative[F].pure(const)
         case vaar @ Var(id) => Applicative[F].pure(vaar)

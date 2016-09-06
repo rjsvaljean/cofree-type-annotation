@@ -30,7 +30,7 @@ object RecTree {
 
     implicit def foldable: Foldable[RecTree] = Foldable[RecTree]
 
-    def traverse[F[_] : Applicative, A, B](f: (A) => F[B])(ta: RecTree[A]): F[RecTree[B]] = ta match {
+    def traverse[F[_] : Applicative, A, B](f: => (A => F[B]))(ta: RecTree[A]): F[RecTree[B]] = ta match {
       case Empty => Applicative[F].pure(Empty)
       case Leaf(a) => Applicative[F].map(f(a))(Leaf(_))
       case Node(l, r) =>

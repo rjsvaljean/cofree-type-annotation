@@ -27,7 +27,7 @@ object Part2GeneralizedCata {
   type Env = Map[String, Int]
   import cats.std.option.optionInstance.tuple2
 
-  def evalAlg[R](env: Env)(expr: ExprF[Option[Int]]): Option[Int] = {
+  def evalAlg(env: Env)(expr: ExprF[Option[Int]]): Option[Int] = {
     import ExprF.{Const, Var, Add, Mul, IfNeg}
     expr match {
       case Const(i) => Some(i)
