@@ -1,7 +1,7 @@
 package rjs.recursion
 
 import cats.{Monoid, Functor}
-import rjs.recursion.data.{NatF, Zero, Succ, ListF, NilF, ConsF, ListFA, Foldable, Fix}
+import rjs.recursion.data.{NatF, Zero, Succ, ListF, NilF, ConsF, ListFA, MyList, Foldable, Fix}
 import rjs.recursion.utils.{funzip, fmap}
 import rjs.recursion.data.Fixpoint.para
 import rjs.recursion.Part1CataForLists.foldr0
@@ -36,6 +36,12 @@ object Part5Paramorphisms {
     }
     para[ListFA[A]#l, List[List[A]], List[A]](alg)
   }
+
+  val tails = schemes.para[ListFA[Int]#l, MyList.T[MyList.T[Int]]] {
+    case NilF => MyList.nil
+    case ConsF(h, (acc, t)) => MyList.cons(MyList.cons(h, t), acc)
+  }
+  def runTails = MyList.toList(tails(MyList(1,2,3))).map(MyList.toList)
 
   def cataTrace[F[_], A](
     alg: F[A] => A

@@ -1,8 +1,8 @@
 package rjs.recursion
 
-import cats.{Functor, Order}
-import rjs.recursion.data.{Cofix, Fix, Stream, StreamF, StreamFA}
-import rjs.recursion.utils.fmap
+import cats.Order
+import rjs.recursion.data.{Fix, Stream, StreamF, StreamFA, ConsF, ListFA, NilF, MyList}
+import schemes.ana
 
 object Part3Anamorphisms {
   def rememberFoldr[A, B](f: Option[(A, B)] => B): List[A] => B = {
@@ -25,6 +25,27 @@ object Part3Anamorphisms {
     unfoldR[A, Int](c)
   }
 
+
+  val tails: (List[Int]) => Fix[ListFA[List[Int]]#l] = ana[ListFA[List[Int]]#l, List[Int]]({
+    case Nil => NilF
+    case h :: t => ConsF(h :: t, t)
+  })
+  def runTails = MyList.toList(tails(List(1,2,3)))
+
+  def range[A](start: A, end: A, produce: A => A) = {
+    val genEndExclusive = ana[ListFA[A]#l, A] {
+      case `end` => NilF
+      case a => ConsF(a, produce(a))
+    }
+    val genInclusive = ana[ListFA[A]#l, Option[A]] {
+      case Some(`end`) => ConsF(end, None)
+      case Some(a) => ConsF(a, Some(produce(a)))
+      case None => NilF
+    }
+    genInclusive(Some(start))
+    genEndExclusive(start)
+  }
+  def runRange = MyList.toList(range[Int](1, 10, _ + 1))
 
   def splitBy[T](pred: T => Boolean): List[T] => List[List[T]] = {
     def c: List[T] => Option[(List[T], List[T])] = {
