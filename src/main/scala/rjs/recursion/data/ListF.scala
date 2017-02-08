@@ -1,6 +1,7 @@
 package rjs.recursion.data
 
 import cats.{Functor, Monoid}
+import rjs.recursion.schemes.cata
 
 sealed trait ListF[+A, +R] extends Product with Serializable {
   def fold[X](ifNil: => X)(ifCons: (A, R) => X): X
@@ -22,11 +23,19 @@ object MyList {
 
   type T[A] = Fix[({type l[r] = ListF[A, r]})#l]
 
-  def apply[A](as: A*): MyList.T[A] = as.foldLeft(
+  def nil[A] = Fix[ListFA[A]#l](ListF.nilF)
+  def cons[A](h: A, t: T[A]) = Fix[ListFA[A]#l](ListF.consF(h, t))
+
+  def apply[A](as: A*): MyList.T[A] = as.foldRight(
     Fix[ListFA[A]#l](NilF): MyList.T[A]
   )(
-    (l: MyList.T[A], i: A) => Fix[ListFA[A]#l](ListF.consF[A, MyList.T[A]](i, l))
+    (i: A, l: MyList.T[A]) => Fix[ListFA[A]#l](ListF.consF[A, MyList.T[A]](i, l))
   )
+
+  def toList[A]: T[A] => List[A] = cata[ListFA[A]#l, List[A]] {
+    case NilF => Nil
+    case ConsF(h, t) => h :: t
+  }
 
 }
 
