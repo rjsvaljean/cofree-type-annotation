@@ -1,7 +1,7 @@
 package rjs.recursion
 
 import cats.Order
-import rjs.recursion.data.{Fix, Stream, StreamF, StreamFA, ConsF, ListFA, NilF, MyList}
+import rjs.recursion.data.{ConsF, Fix, ListFA, MyList, NilF, Stream, StreamF, StreamFA}
 import schemes.ana
 
 object Part3Anamorphisms {
@@ -26,11 +26,13 @@ object Part3Anamorphisms {
   }
 
 
-  val tails: (List[Int]) => Fix[ListFA[List[Int]]#l] = ana[ListFA[List[Int]]#l, List[Int]]({
-    case Nil => NilF
-    case h :: t => ConsF(h :: t, t)
+  val tails: (MyList.T[Int]) => MyList.T[MyList.T[Int]] = ana[ListFA[MyList.T[Int]]#l, MyList.T[Int]]({ f =>
+    f.unFix match {
+      case NilF => NilF
+      case ConsF(h, t) => ConsF(Fix[ListFA[Int]#l](ConsF(h, t)), t)
+    }
   })
-  def runTails = MyList.toList(tails(List(1,2,3)))
+  def runTails = MyList.toList(tails(MyList(1,2,3))).map(MyList.toList)
 
   def range[A](start: A, end: A, produce: A => A) = {
     val genEndExclusive = ana[ListFA[A]#l, A] {
