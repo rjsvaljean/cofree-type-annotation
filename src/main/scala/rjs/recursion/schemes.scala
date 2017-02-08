@@ -42,6 +42,13 @@ object schemes {
     cata[F, (A, Fix[F])](&&&(alg, fmap[F, (A, Fix[F]), Fix[F]](_._2) andThen Fix[F])) andThen(_._1)
   }
 
+  def apoContrastedWithPara[F[_]: Functor, A](coalg: A => F[Either[A, Fix[F]]]): A => Fix[F] = {
+    val left: (A) => Either[A, Fix[F]] = Left(_)
+    val right: (Fix[F]) => Either[A, Fix[F]] = Right(_)
+
+    left andThen ana[F, Either[A, Fix[F]]](|||(coalg, (unFix[F](_)) andThen fmap[F, Fix[F], Either[A, Fix[F]]](right)))
+  }
+
   def paraMemoized[F[_]: Functor: Traversable, A](alg: F[(A, Fix[F])] => A): Fix[F] => A = {
     memoizedCata[F, (A, Fix[F])](&&&(alg, fmap[F, (A, Fix[F]), Fix[F]](_._2) andThen Fix[F])) andThen(_._1)
   }
@@ -67,6 +74,7 @@ object schemes {
   def apo[F[_]: Functor, A](coalg: A => F[Either[A, Fix[F]]]): A => Fix[F] = {
     Fix[F] _ compose fmap(|||(apo[F, A](coalg), identity[Fix[F]])) compose coalg
   }
+
   def histo[F[_]: Functor, A](alg: F[Ann.T[F, A]] => A): Fix[F] => A = {
     Ann.attr[F, A] compose cata(Ann.ann[F, A] compose &&&(identity[F[Ann.T[F, A]]], alg))
   }
