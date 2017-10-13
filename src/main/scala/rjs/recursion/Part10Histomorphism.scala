@@ -6,7 +6,7 @@ import rjs.recursion.data._
 object Part10Histomorphism {
 
   def fib: Int => Int = {
-    val unAnnNat = Ann.unAnn[NatF, Int, Int]
+    val unAnnNat = Ann.unAnn[NatF, Int]
     def f: NatF[Ann.T[NatF, Int]] => Int = {
       case Zero => 0
       case Succ(i) => unAnnNat(i) match {

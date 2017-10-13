@@ -25,7 +25,7 @@ object Ann{
     unFix[AnnFA[F, A]#l] andThen(_.fr)
   }
 
-  def stripAll[F[_]: Functor, A, R]: Ann.T[F, A] => Fix[F] = {
+  def stripAll[F[_]: Functor, A]: Ann.T[F, A] => Fix[F] = {
     def alg(ann: AnnF[F, A, Fix[F]]) = Fix[F](ann.fr)
     cata[AnnFA[F, A]#l, Fix[F]](alg)
   }
@@ -34,7 +34,7 @@ object Ann{
     Function.tupled(AnnF[F, A, Ann.T[F, A]] _) andThen Fix[AnnFA[F, A]#l]
   }
 
-  def unAnn[F[_]: Functor, A, R]: Ann.T[F, A] => (F[Ann.T[F, A]], A) = { (annFA: Ann.T[F, A]) =>
+  def unAnn[F[_]: Functor, A]: Ann.T[F, A] => (F[Ann.T[F, A]], A) = { (annFA: Ann.T[F, A]) =>
     val AnnF(fr, a) = annFA.unFix
     (fr, a)
   }
