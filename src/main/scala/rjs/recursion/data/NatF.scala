@@ -15,6 +15,7 @@ case class Succ[R](r: R) extends NatF[R] {
 }
 
 object NatF {
+  type T = Fix[NatF]
   def zero: NatF[Nothing] = Zero
   def succ[R](r: R): NatF[R] = Succ(r)
 
@@ -23,5 +24,20 @@ object NatF {
       case Zero => zero
       case Succ(r) => succ(f(r))
     }
+  }
+
+  def expand(i: Int): Fix[NatF] = i match {
+    case 0 ⇒ Fix[NatF](zero)
+    case n ⇒ Fix[NatF](succ(expand(n - 1)))
+  }
+
+  def toInt(n: Fix[NatF]): Int = n match {
+    case Fix(Zero) ⇒ 0
+    case Fix(Succ(_n)) ⇒ 1 + toInt(_n)
+  }
+
+  def compress[A](n: NatF[Ann.T[NatF, A]]): Int = n match {
+    case Zero ⇒ 0
+    case Succ(f) ⇒ 1 + compress(f.unFix.fr)
   }
 }
