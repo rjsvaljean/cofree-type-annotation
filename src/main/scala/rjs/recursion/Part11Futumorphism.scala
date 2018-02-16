@@ -26,6 +26,8 @@ object Part11Futumorphism {
 }
 
 object Horticulture {
+  import cats.data.State
+
   sealed trait Plant[+A]
   case class Root[A](a: A) extends Plant[A]
   case class Stalk[A](a: A) extends Plant[A]
@@ -51,12 +53,43 @@ object Horticulture {
     }
   }
 
-  sealed trait Action
+  sealed trait Action extends Product with Serializable
   case object Flower extends Action
   case object Upwards extends Action
   case object Branch extends Action
 
-  case class StdGen()
+  case class SimpleRNG(seed: Long) extends AnyVal {
+    def nextInt: (SimpleRNG, Int) = {
+      val newSeed = (seed * 0x5DEECE66DL + 0xBL) & 0xFFFFFFFFFFFFL
+      val nextRNG = SimpleRNG(newSeed)
+      val n = (newSeed >>> 16).toInt
+      (nextRNG, n)
+    }
+  }
 
-  case class Seed(height: Int, rng: StdGen)
+  type RNG[A] = State[SimpleRNG, A]
+  val rng: RNG[Int] = State((_: SimpleRNG).nextInt)
+  val oneToFive: RNG[Int] = rng.map(i ⇒ math.abs(i % 5))
+  val grow: State[Seed, Action] = rng.map {
+    case 0 ⇒ Flower
+    case 1 ⇒ Branch
+    case _ ⇒ Upwards
+  }.transformS((_: Seed).rng, (seed: Seed, rng) ⇒ seed.copy(rng = rng))
+  case class Seed(height: Int, rng: SimpleRNG)
+
+  type CVCoalgebra[F[_], A] = A ⇒ F[Ctx.T[F, A]]
+  val sow: CVCoalgebra[Plant, Seed] = { case (seed @ Seed(height, _)) ⇒
+    val (next, action) = grow.run(seed).value
+    (action, height) match {
+      case (_, 0) ⇒ Root(Ctx.term[Plant, Seed](next))
+      case (_, 10) ⇒ Bloom
+      case (Flower, _) ⇒ Bloom
+      case (Upwards, _) ⇒ Stalk(Ctx.term[Plant, Seed](next))
+      case (Branch, _) ⇒ Fork(
+        Ctx.hole(Stalk(Ctx.term[Plant, Seed](next))),
+        Ctx.hole(Bloom),
+        Ctx.hole(Stalk(Ctx.term[Plant, Seed](next)))
+      )
+    }
+  }
 }

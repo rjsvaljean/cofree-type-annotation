@@ -28,7 +28,7 @@ object Ctx {
     }
   }
 
-  def term[F[_]: Functor, A](x: F[Fix[CtxFA[F, A]#l]]): Ctx.T[F, A] =
+  def term[F[_]: Functor, A](x: F[Ctx.T[F, A]]): Ctx.T[F, A] =
     Fix[CtxFA[F, A]#l](Term[F, A, Fix[CtxFA[F, A]#l]](x))
 
   def hole[F[_]: Functor, A](a: A): Ctx.T[F, A] =
